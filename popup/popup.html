@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Auto Decliner</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Cookie Auto Decliner</h1>
+            <p class="subtitle">Automatically decline cookie banners</p>
+        </div>
+
+        <!-- Toggle Section -->
+        <div class="section">
+            <div class="toggle-container">
+                <label class="toggle-label">
+                    <span>Enable Auto Decline</span>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="enableToggle" checked>
+                        <span class="slider"></span>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Statistics Section -->
+        <div class="section">
+            <h2>Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="currentPageCount">0</div>
+                    <div class="stat-label">This Page</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">Total Declined</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Trigger Section -->
+        <div class="section">
+            <button id="manualTrigger" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 2V8M8 8V14M8 8H14M8 8H2" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" />
+                </svg>
+                Scan Now
+            </button>
+        </div>
+
+        <!-- Status Section -->
+        <div class="section">
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <a href="#" id="openOptions" class="link">Settings</a>
+            <span class="separator">•</span>
+            <span class="version">v1.0.0</span>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>
