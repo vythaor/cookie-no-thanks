@@ -9,18 +9,36 @@ class CookieDecliner {
     }
 
     /**
+     * Log banner element info for debugging
+     */
+    logBannerInfo(banner, label) {
+        const tag = banner.tagName?.toLowerCase() || '?';
+        const id = banner.id || '(no id)';
+        const cls = (banner.className && typeof banner.className === 'string') ? banner.className.trim().slice(0, 80) : '(no class)';
+        const text = (banner.innerText || banner.textContent || '').trim().slice(0, 200);
+        console.log(`[Cookie Auto Decliner] ${label}:`, {
+            tag,
+            id,
+            class: cls,
+            textPreview: text ? text.replace(/\s+/g, ' ') : '(no text)'
+        });
+    }
+
+    /**
      * Main function to decline cookies in a banner
      * @param {HTMLElement} banner - The detected banner element
      * @returns {boolean} - True if successfully declined
      */
     async declineCookies(banner) {
         if (this.processedBanners.has(banner)) {
+            console.log('[Cookie Auto Decliner] Skipping already processed banner');
             return false;
         }
-
+        console.log('declined cookie', banner);
         this.processedBanners.add(banner);
+        this.logBannerInfo(banner, 'Cookie popup to process');
 
-        // Try different strategies in order of preference
+        const strategyNames = ['clickDeclineButton', 'clickNecessaryOnlyButton', 'clickCloseButton', 'removeDirectly'];
         const strategies = [
             () => this.clickDeclineButton(banner),
             () => this.clickNecessaryOnlyButton(banner),
@@ -28,21 +46,24 @@ class CookieDecliner {
             () => this.removeDirectly(banner)
         ];
 
-        for (const strategy of strategies) {
+        for (let i = 0; i < strategies.length; i++) {
             try {
-                const success = await strategy();
+                const success = await strategies[i]();
                 if (success) {
                     this.stats.declined++;
                     this.removeOverlays();
                     this.restorePageScroll();
-                    console.log('Cookie banner declined successfully');
+                    console.log('[Cookie Auto Decliner] Strategy succeeded:', strategyNames[i]);
+                    console.log('[Cookie Auto Decliner] Cookie banner declined successfully');
+                    console.log('[Cookie Auto Decliner] If the cookie popup is still visible, the site may not have reacted to the click.');
                     return true;
                 }
             } catch (error) {
-                console.error('Strategy failed:', error);
+                console.error('[Cookie Auto Decliner] Strategy failed:', strategyNames[i], error);
             }
         }
 
+        console.log('[Cookie Auto Decliner] No strategy succeeded for this banner');
         return false;
     }
 
@@ -50,10 +71,16 @@ class CookieDecliner {
      * Try to find and click a "Decline/Reject" button
      */
     clickDeclineButton(banner) {
-        const button = this.findButton(banner, COOKIE_SELECTORS.declineButtons);
-
+        const { button, matchedPattern } = this.findButtonWithPattern(banner, COOKIE_SELECTORS.declineButtons);
         if (button) {
-            console.log('Found decline button:', button);
+            const btnText = (button.innerText || button.textContent || button.value || '').trim().slice(0, 60);
+            console.log('[Cookie Auto Decliner] Reject button clicked:', {
+                matchedPattern,
+                buttonText: btnText,
+                tag: button.tagName,
+                id: button.id || '(no id)',
+                class: (button.className && String(button.className).slice(0, 60)) || '(no class)'
+            });
             this.simulateClick(button);
             return true;
         }
@@ -65,10 +92,14 @@ class CookieDecliner {
      * Try to find and click a "Necessary Only" button
      */
     clickNecessaryOnlyButton(banner) {
-        const button = this.findButton(banner, COOKIE_SELECTORS.necessaryOnlyButtons);
+        const { button, matchedPattern } = this.findButtonWithPattern(banner, COOKIE_SELECTORS.necessaryOnlyButtons);
 
         if (button) {
-            console.log('Found necessary-only button:', button);
+            const btnText = (button.innerText || button.textContent || button.value || '').trim().slice(0, 60);
+            console.log('[Cookie Auto Decliner] Necessary-only button clicked:', {
+                matchedPattern,
+                buttonText: btnText
+            });
             this.simulateClick(button);
             return true;
         }
@@ -86,7 +117,7 @@ class CookieDecliner {
             try {
                 const button = banner.querySelector(selector);
                 if (button && this.isVisible(button)) {
-                    console.log('Found close button:', button);
+                    console.log('[Cookie Auto Decliner] Close button clicked:', { selector, tag: button.tagName });
                     this.simulateClick(button);
                     return true;
                 }
@@ -110,48 +141,64 @@ class CookieDecliner {
     }
 
     /**
-     * Find a button matching any of the given patterns
+     * Find a button matching any of the given patterns; returns button and which pattern matched (for logging).
+     */
+    findButtonWithPattern(banner, patterns) {
+        try {
+            if (!banner || typeof banner.querySelectorAll !== 'function') {
+                return { button: null, matchedPattern: null };
+            }
+            const buttons = banner.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]');
+
+            for (const button of buttons) {
+                if (!this.isVisible(button)) continue;
+
+                const rawText = (button.innerText ?? button.textContent ?? button.value ?? '').toString();
+                const buttonText = rawText.toLowerCase().trim();
+                const ariaLabel = (button.getAttribute('aria-label') ?? '').toString().toLowerCase();
+                const title = (button.getAttribute('title') ?? '').toString().toLowerCase();
+
+                for (const pattern of patterns) {
+                    if (typeof pattern === 'string' && !pattern.startsWith('[')) {
+                        const patternLower = pattern.toLowerCase();
+                        if (buttonText.includes(patternLower) ||
+                            ariaLabel.includes(patternLower) ||
+                            title.includes(patternLower)) {
+                            console.log('[Cookie Auto Decliner] Pattern matched (decline/necessary):', {
+                                pattern,
+                                detectedText: { buttonText: buttonText.slice(0, 60), ariaLabel: ariaLabel.slice(0, 60), title: title.slice(0, 60) }
+                            });
+                            return { button, matchedPattern: pattern };
+                        }
+                    }
+                }
+            }
+
+            for (const pattern of patterns) {
+                if (typeof pattern === 'string' && pattern.startsWith('[')) {
+                    try {
+                        const element = banner.querySelector(pattern);
+                        if (element && this.isVisible(element)) {
+                            console.log('[Cookie Auto Decliner] Pattern matched (selector):', { pattern });
+                            return { button: element, matchedPattern: pattern };
+                        }
+                    } catch (e) {
+                        // Invalid selector, continue
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('[Cookie Auto Decliner] findButtonWithPattern error:', err);
+        }
+        return { button: null, matchedPattern: null };
+    }
+
+    /**
+     * Find a button matching any of the given patterns (legacy API)
      */
     findButton(banner, patterns) {
-        // First, try to find by text content
-        const buttons = banner.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]');
-
-        for (const button of buttons) {
-            if (!this.isVisible(button)) continue;
-
-            const buttonText = button.innerText.toLowerCase().trim();
-            const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
-            const title = (button.getAttribute('title') || '').toLowerCase();
-
-            // Check if button text matches any pattern
-            for (const pattern of patterns) {
-                if (typeof pattern === 'string') {
-                    const patternLower = pattern.toLowerCase();
-
-                    if (buttonText.includes(patternLower) ||
-                        ariaLabel.includes(patternLower) ||
-                        title.includes(patternLower)) {
-                        return button;
-                    }
-                }
-            }
-        }
-
-        // Try selector-based patterns
-        for (const pattern of patterns) {
-            if (typeof pattern === 'string' && pattern.startsWith('[')) {
-                try {
-                    const element = banner.querySelector(pattern);
-                    if (element && this.isVisible(element)) {
-                        return element;
-                    }
-                } catch (e) {
-                    // Invalid selector, continue
-                }
-            }
-        }
-
-        return null;
+        const { button } = this.findButtonWithPattern(banner, patterns);
+        return button;
     }
 
     /**

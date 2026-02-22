@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cookie Auto Decliner - Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>Cookie Auto Decliner Settings</h1>
+      <p class="subtitle">Configure your preferences</p>
+    </header>
+
+    <main class="main">
+      <!-- General Settings -->
+      <section class="section">
+        <h2>General Settings</h2>
+        
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="enableExtension">Enable Extension</label>
+            <p class="description">Automatically decline cookie banners on all websites</p>
+          </div>
+          <div class="toggle-switch">
+            <input type="checkbox" id="enableExtension" checked>
+            <span class="slider"></span>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="showNotifications">Show Notifications</label>
+            <p class="description">Display a brief notification when a banner is declined</p>
+          </div>
+          <div class="toggle-switch">
+            <input type="checkbox" id="showNotifications">
+            <span class="slider"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Whitelist Section -->
+      <section class="section">
+        <h2>Whitelisted Domains</h2>
+        <p class="description">Cookie banners will NOT be automatically declined on these domains</p>
+        
+        <div class="whitelist-container">
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="whitelistInput" 
+              placeholder="example.com"
+              class="text-input"
+            >
+            <button id="addWhitelist" class="btn btn-primary">Add</button>
+          </div>
+          
+          <ul id="whitelistList" class="domain-list">
+            <!-- Domains will be added here dynamically -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- Statistics Section -->
+      <section class="section">
+        <h2>Statistics</h2>
+        
+        <div class="stats-container">
+          <div class="stat-card">
+            <div class="stat-value" id="totalDeclined">0</div>
+            <div class="stat-label">Total Banners Declined</div>
+          </div>
+        </div>
+
+        <button id="resetStats" class="btn btn-secondary">Reset Statistics</button>
+      </section>
+
+      <!-- About Section -->
+      <section class="section">
+        <h2>About</h2>
+        <p class="description">
+          Cookie Auto Decliner automatically detects and declines cookie consent banners
+          to improve your browsing experience.
+        </p>
+        <div class="about-info">
+          <p><strong>Version:</strong> 1.0.0</p>
+          <p><strong>Author:</strong> Sherry</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div id="saveStatus" class="save-status"></div>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

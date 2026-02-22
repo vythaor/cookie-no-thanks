@@ -152,11 +152,12 @@ const COOKIE_SELECTORS = {
 };
 
 // Patterns for identifying high z-index elements (potential popups)
-const HIGH_Z_INDEX_THRESHOLD = 999;
+const HIGH_Z_INDEX_THRESHOLD = window.innerWidth > 999 ? 999 : 9999;
 
 // Common attributes that indicate a cookie banner
 const COOKIE_INDICATORS = {
     classKeywords: ['cookie', 'consent', 'gdpr', 'privacy', 'banner', 'notice'],
     idKeywords: ['cookie', 'consent', 'gdpr', 'privacy'],
-    ariaLabels: ['cookie', 'consent', 'privacy', 'notice']
+    ariaLabels: ['cookie', 'consent', 'privacy', 'notice'],
+    buttonTextKeywords: ['reject', 'accept']
 };

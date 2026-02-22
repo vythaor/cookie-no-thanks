@@ -8,8 +8,6 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.storage.sync.set({
         enabled: true,
         showNotifications: false,
-        whitelistedDomains: [],
-        totalDeclined: 0
     });
 
     // Set initial badge
@@ -38,14 +36,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Handle banner declined event
  */
 function handleBannerDeclined(message, sender) {
-    // Update total count in storage
-    chrome.storage.sync.get(['totalDeclined'], (result) => {
-        const newTotal = (result.totalDeclined || 0) + 1;
-        chrome.storage.sync.set({ totalDeclined: newTotal });
-    });
-
-    // Log the event
-    console.log(`Banner declined on ${message.url}`);
 
     // Update badge for this tab
     if (sender.tab && sender.tab.id) {
@@ -54,14 +44,15 @@ function handleBannerDeclined(message, sender) {
 }
 
 /**
- * Update badge count on extension icon
+ * Update badge: show check icon when cookie was declined on this tab
  */
 function updateBadge(tabId, count) {
     if (count > 0) {
         chrome.action.setBadgeText({
             tabId: tabId,
-            text: count.toString()
+            text: '✓'
         });
+        chrome.action.setBadgeBackgroundColor({ tabId: tabId, color: '#7a9b5c' });
     } else {
         chrome.action.setBadgeText({
             tabId: tabId,

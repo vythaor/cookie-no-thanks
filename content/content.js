@@ -105,16 +105,22 @@
      */
     async function processBanner(banner) {
         try {
+            const tag = banner.tagName?.toLowerCase() || '?';
+            const id = banner.id || '(no id)';
+            const textPreview = (banner.innerText || banner.textContent || '').trim().slice(0, 150).replace(/\s+/g, ' ');
+            console.log('[Cookie Auto Decliner] Processing cookie popup:', { tag, id, textPreview });
+
             const success = await cookieDecliner.declineCookies(banner);
 
             if (success) {
                 processedCount++;
                 cookieBannerDetector.markAsDetected(banner);
 
-                // Update badge count
+                console.log('[Cookie Auto Decliner] Cookie banner was declined on this page');
+                console.log('[Cookie Auto Decliner] Reporting success. If the cookie popup is still visible, the site may not have reacted to the click.');
+
                 updateBadge(processedCount);
 
-                // Send message to background script
                 chrome.runtime.sendMessage({
                     type: 'BANNER_DECLINED',
                     count: processedCount,
@@ -124,7 +130,7 @@
                 });
             }
         } catch (error) {
-            console.error('Error processing banner:', error);
+            console.error('[Cookie Auto Decliner] Error processing banner:', error);
         }
     }
 

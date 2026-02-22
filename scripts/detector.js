@@ -31,6 +31,24 @@ class CookieBannerDetector {
     }
 
     /**
+     * Log detected banner info for debugging
+     */
+    logDetectedBanner(element, source, extra = {}) {
+        const tag = element.tagName?.toLowerCase() || '?';
+        const id = element.id || '(no id)';
+        const cls = (element.className && typeof element.className === 'string') ? element.className.trim().slice(0, 80) : '(no class)';
+        const text = (element.innerText || element.textContent || '').trim().slice(0, 200);
+        console.log('[Cookie Auto Decliner] Cookie popup detected:', {
+            source,
+            tag,
+            id,
+            class: cls,
+            textDetected: text ? text.replace(/\s+/g, ' ') : '(no text)',
+            ...extra
+        });
+    }
+
+    /**
      * Detect banners using predefined selectors
      */
     detectByKnownSelectors() {
@@ -41,6 +59,7 @@ class CookieBannerDetector {
                 const elements = document.querySelectorAll(selector);
                 elements.forEach(element => {
                     if (this.isLikelyCookieBanner(element)) {
+                        this.logDetectedBanner(element, 'known selector', { selector });
                         banners.push(element);
                     }
                 });
@@ -65,8 +84,8 @@ class CookieBannerDetector {
             if (zIndex >= HIGH_Z_INDEX_THRESHOLD) {
                 const text = element.innerText.toLowerCase();
 
-                // Check if text content suggests it's a cookie banner
                 if (this.containsCookieKeywords(text)) {
+                    this.logDetectedBanner(element, 'z-index', { zIndex });
                     banners.push(element);
                 }
             }
@@ -93,19 +112,39 @@ class CookieBannerDetector {
             // Check for cookie keywords in text
             const hasCookieText = this.containsCookieKeywords(text);
 
-            // Check for cookie keywords in attributes
+            // Check for cookie keywords in attributes or button text (reject/accept)
             const hasCookieAttributes =
                 COOKIE_INDICATORS.classKeywords.some(keyword => className.includes(keyword)) ||
-                COOKIE_INDICATORS.idKeywords.some(keyword => id.includes(keyword));
+                COOKIE_INDICATORS.idKeywords.some(keyword => id.includes(keyword)) ||
+                this.hasButtonsWithConsentText(element);
 
             if ((hasCookieText && text.length > 20) || hasCookieAttributes) {
                 if (this.isLikelyCookieBanner(element)) {
+                    this.logDetectedBanner(element, 'keywords', {
+                        hasCookieText,
+                        hasCookieAttributes,
+                        textLength: text.length
+                    });
                     banners.push(element);
                 }
             }
         });
 
         return banners;
+    }
+
+    /**
+     * Check if element contains a button with consent-related text (e.g. "reject", "accept")
+     */
+    hasButtonsWithConsentText(element) {
+        const buttons = element.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]');
+        for (const btn of buttons) {
+            const btnText = (btn.innerText || btn.textContent || btn.value || btn.getAttribute('aria-label') || '').toLowerCase().trim();
+            if (COOKIE_INDICATORS.buttonTextKeywords.some(keyword => btnText.includes(keyword))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

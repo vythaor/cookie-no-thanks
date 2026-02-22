@@ -225,7 +225,7 @@ MIT License - See LICENSE file for details
 
 ## Credits
 
-Developed by [Your Name]
+Developed by Sherry
 
 ## Support
 
