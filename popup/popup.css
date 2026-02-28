@@ -1,4 +1,4 @@
-/* Figma-inspired: brick background, cream cards, dark brown theme */
+/* Brown gradient + glassmorphism theme */
 
 * {
     margin: 0;
@@ -9,134 +9,145 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     width: 320px;
-    min-height: 400px;
-    color: #3d2914;
-    /* Brick wall background */
-    background-color: #e8c4a0;
-    background-image:
-        linear-gradient(90deg, rgba(220, 180, 140, 0.4) 0%, transparent 50%),
-        linear-gradient(0deg, rgba(220, 180, 140, 0.3) 0%, transparent 50%),
-        repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 18px,
-            rgba(255, 255, 255, 0.5) 18px,
-            rgba(255, 255, 255, 0.5) 20px
-        ),
-        repeating-linear-gradient(
-            90deg,
-            transparent,
-            transparent 44px,
-            rgba(255, 255, 255, 0.45) 44px,
-            rgba(255, 255, 255, 0.45) 46px
-        );
-    background-size: 100% 100%, 100% 100%, 46px 20px, 46px 20px;
-    background-position: 0 0, 0 0, 0 0, 0 0;
+    min-height: 200px;
+    color: #fdf6ee;
+    /* Rich brown gradient background */
+    background: linear-gradient(145deg, #2c1a0e 0%, #4a2c1a 30%, #6b3a1f 60%, #3d2010 100%);
 }
 
 .container {
     padding: 20px 16px 16px;
-    min-height: 100%;
+    min-height: 100px;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    animation: fadeIn 0.35s ease-out;
 }
 
 /* Title */
 .title {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
-    color: #3d2914;
+    color: #fdf6ee;
     text-align: left;
     margin-bottom: 4px;
     letter-spacing: -0.02em;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
 }
 
-/* Cards: cream/beige with orange border */
+/* Glass cards */
 .card {
-    background: #faf5ee;
-    border: 1px solid #d4a574;
-    border-radius: 12px;
-    padding: 14px 16px;
-    box-shadow: 0 1px 2px rgba(61, 41, 20, 0.06);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 220, 180, 0.2);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 220, 180, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
-/* Toggle row */
-.toggle-row {
+/* Toggle label */
+.toggle-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: #fdf6ee;
+    text-align: center;
+    display: block;
+    margin-bottom: 12px;
+}
+
+/* Power card: image left, button right, both vcenter */
+.power-card {
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
+}
+
+/* Wrapper label */
+.power-btn-wrap {
+    position: relative;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     user-select: none;
 }
 
-.toggle-label {
-    font-size: 15px;
-    font-weight: 600;
-    color: #3d2914;
-}
-
-.toggle-wrap {
-    position: relative;
-    flex-shrink: 0;
-}
-
-.toggle-wrap input {
+/* Hide the real checkbox */
+.power-btn-wrap input {
     position: absolute;
     opacity: 0;
     width: 0;
     height: 0;
 }
 
-.toggle-track {
-    display: block;
-    width: 52px;
-    height: 28px;
-    background: #b0a090;
-    border-radius: 28px;
-    position: relative;
-    transition: background 0.25s ease;
-}
-
-.toggle-knob {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 22px;
-    height: 22px;
-    background: #6b5b4a;
-    border-radius: 50%;
-    transition: transform 0.25s ease;
+/* The circular button — glass off state */
+.power-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 220, 180, 0.25);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 220, 180, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
 }
 
-.toggle-wrap input:checked + .toggle-track {
-    background: #8b6914;
+.power-btn:hover {
+    transform: scale(1.06);
+    background: rgba(255, 255, 255, 0.15);
 }
 
-.toggle-wrap input:checked + .toggle-track .toggle-knob {
-    transform: translateX(24px);
+.power-btn:active {
+    transform: scale(0.96);
 }
 
-.cookie-mascot {
-    font-size: 12px;
-    line-height: 1;
-    filter: drop-shadow(0 0 0 #3d2914);
+/* Icon inside the button */
+.power-icon {
+    width: 40px;
+    height: 40px;
+    opacity: 0.45;
+    filter: brightness(0) invert(1);
+    transition: opacity 0.25s ease, filter 0.25s ease;
 }
 
-/* Shown only when cookie was declined on this page */
+/* Checked (enabled) state — warm amber glow */
+.power-btn-wrap input:checked+.power-btn {
+    background: linear-gradient(145deg, rgba(205, 133, 63, 0.6), rgba(160, 90, 30, 0.5));
+    border-color: rgba(255, 190, 100, 0.5);
+    box-shadow:
+        0 0 0 3px rgba(205, 133, 63, 0.25),
+        0 6px 20px rgba(160, 90, 30, 0.5),
+        inset 0 1px 0 rgba(255, 210, 140, 0.3);
+}
+
+.power-btn-wrap input:checked+.power-btn .power-icon {
+    opacity: 1;
+    filter: brightness(0) invert(1);
+}
+
+/* Status message — glass style */
 .status-message {
     padding: 12px 16px;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 14px;
     font-weight: 600;
-    background: #e8f0e0;
-    border: 1px solid #7a9b5c;
-    color: #2d3d1f;
+    background: rgba(120, 180, 80, 0.15);
+    border: 1px solid rgba(140, 200, 100, 0.3);
+    color: #c8e6a8;
+    box-shadow: inset 0 1px 0 rgba(200, 230, 160, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .status-message[hidden] {
@@ -151,22 +162,27 @@ body {
 .btn-rescan {
     width: 100%;
     padding: 14px 20px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #fff;
-    background: #3d2914;
-    border: none;
+    color: #fdf6ee;
+    background: linear-gradient(145deg, rgba(180, 100, 40, 0.7), rgba(120, 60, 20, 0.65));
+    border: 1px solid rgba(255, 190, 100, 0.3);
     border-radius: 14px;
     cursor: pointer;
-    transition: background 0.2s, transform 0.15s;
-    box-shadow: 0 2px 4px rgba(61, 41, 20, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+        0 2px 12px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 210, 140, 0.2);
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
 }
 
 .btn-rescan:hover {
-    background: #2d1f0f;
+    background: linear-gradient(145deg, rgba(205, 120, 55, 0.8), rgba(140, 75, 25, 0.75));
     transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 210, 140, 0.25);
 }
 
 .btn-rescan:active {
@@ -174,32 +190,33 @@ body {
 }
 
 .btn-rescan:disabled {
-    background: #8b7355;
+    background: rgba(100, 70, 40, 0.4);
+    border-color: rgba(255, 190, 100, 0.12);
+    color: rgba(253, 246, 238, 0.4);
     cursor: not-allowed;
     transform: none;
+    box-shadow: none;
 }
 
 /* Footer */
 .footer {
-    margin-top: auto;
-    padding-top: 12px;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: 12px;
-    min-height: 52px;
+    min-height: 24px;
 }
 
 .link-settings {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    color: #3d2914;
+    color: rgba(253, 220, 170, 0.8);
     text-decoration: none;
-    transition: opacity 0.2s;
+    transition: color 0.2s, opacity 0.2s;
 }
 
 .link-settings:hover {
-    opacity: 0.8;
+    color: #fdf6ee;
     text-decoration: underline;
 }
 
@@ -214,18 +231,15 @@ body {
     font-size: 14px;
     font-weight: 800;
     letter-spacing: 0.04em;
-    color: #3d2914;
+    color: rgba(253, 220, 170, 0.9);
     transform: rotate(3deg);
     text-transform: uppercase;
-    text-shadow: 0 0 0 #3d2914;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
-.no-thanks-illus {
-    font-size: 20px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    gap: 2px;
+.no-thanks-img {
+    height: 100px;
+    width: 100px;
 }
 
 /* Animations */
@@ -234,12 +248,9 @@ body {
         opacity: 0;
         transform: translateY(-8px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
     }
-}
-
-.container {
-    animation: fadeIn 0.3s ease-out;
 }

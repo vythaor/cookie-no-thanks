@@ -27,6 +27,8 @@ class CookieBannerDetector {
         const uniqueBanners = this.removeDuplicates(banners);
         const visibleBanners = uniqueBanners.filter(banner => this.isVisible(banner));
 
+        console.log('[Cookie Auto Decliner] Found ' + visibleBanners.length + ' cookie banner(s)');
+
         return visibleBanners;
     }
 

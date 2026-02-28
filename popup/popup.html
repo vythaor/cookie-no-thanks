@@ -14,18 +14,17 @@
         <h1 class="title">Auto decline cookie</h1>
 
         <!-- Enable Auto decline Card -->
-        <div class="card">
-            <label class="toggle-row" for="enableToggle">
-                <span class="toggle-label">Enable Auto decline</span>
-                <div class="toggle-wrap">
-                    <input type="checkbox" id="enableToggle" checked>
-                    <span class="toggle-track">
-                        <span class="toggle-knob">
-                            <span class="cookie-mascot" aria-hidden="true">🍪</span>
-                        </span>
-                    </span>
-                </div>
+        <div class="card power-card">
+            <label class="power-btn-wrap" for="enableToggle" aria-label="Toggle Auto Decline">
+                <input type="checkbox" id="enableToggle" checked>
+                <span class="power-btn">
+                    <img src="../icons/icon-power.svg" class="power-icon" alt="" aria-hidden="true">
+                </span>
             </label>
+            <div class="no-thanks-block">
+                <span class="no-thanks-text">NO THANKS!</span>
+                <img class="no-thanks-img" src="../icons/img.png" alt="meme">
+            </div>
         </div>
 
         <!-- Only shown when cookie was declined on this page -->
@@ -39,12 +38,6 @@
         <!-- Footer -->
         <footer class="footer">
             <a href="#" id="openOptions" class="link-settings">Settings</a>
-            <div class="no-thanks-block">
-                <span class="no-thanks-text">NO THANKS!</span>
-                <div class="no-thanks-illus" aria-hidden="true">
-                    <span class="hand-stop">🖐</span><span class="cookie-icon">🍪</span>
-                </div>
-            </div>
         </footer>
     </div>
 
