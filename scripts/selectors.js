@@ -34,24 +34,39 @@ const COOKIE_SELECTORS = {
         '#didomi-popup',
         '#didomi-notice',
 
-        // Generic patterns (class-based)
+        // Generic patterns (class-based) — singular and plural forms
         '[class*="cookie-banner"]',
+        '[class*="cookies-banner"]',
         '[class*="cookie-consent"]',
+        '[class*="cookies-consent"]',
         '[class*="cookie-notice"]',
+        '[class*="cookies-notice"]',
         '[class*="cookie-popup"]',
+        '[class*="cookies-popup"]',
+        '[class*="cookie-bar"]',
+        '[class*="cookies-bar"]',
+        '[class*="cookie-modal"]',
+        '[class*="cookies-modal"]',
         '[class*="gdpr-banner"]',
         '[class*="gdpr-consent"]',
         '[class*="privacy-banner"]',
         '[class*="consent-banner"]',
-        '[class*="cookie-bar"]',
-        '[class*="cookies-banner"]',
+        '[class*="consent-modal"]',
+        '[class*="cookie-policy"]',
+        '[class*="cookies-policy"]',
 
         // Generic patterns (ID-based)
         '[id*="cookie-banner"]',
+        '[id*="cookies-banner"]',
         '[id*="cookie-consent"]',
+        '[id*="cookies-consent"]',
         '[id*="cookie-notice"]',
+        '[id*="cookies-notice"]',
+        '[id*="cookie-bar"]',
+        '[id*="cookies-bar"]',
         '[id*="gdpr"]',
         '[id*="privacy-banner"]',
+        '[id*="consent-banner"]',
 
         // ARIA and semantic patterns
         '[role="dialog"][aria-label*="cookie" i]',
@@ -64,72 +79,163 @@ const COOKIE_SELECTORS = {
         // Direct text matching (will be used with contains selector)
         'reject all',
         'reject',
-        'decline',
         'decline all',
-        'deny',
+        'decline',
         'deny all',
-        'refuse',
+        'deny',
         'refuse all',
+        'refuse',
         'no thanks',
-        'no',
+        'no, thanks',
         'dismiss',
+        'do not accept',
+        'don\'t accept',
+        'do not allow',
+        'don\'t allow',
+        'not now',
+        'disallow',
+        'opt out',
+        'opt-out',
 
         // Multi-language support
         // German
         'ablehnen',
         'alle ablehnen',
+        'nicht akzeptieren',
 
         // French
         'refuser',
         'tout refuser',
         'rejeter',
+        'je refuse',
 
         // Spanish
         'rechazar',
         'rechazar todo',
         'denegar',
+        'no aceptar',
 
         // Italian
         'rifiuta',
         'rifiuta tutto',
+        'non accettare',
 
         // Dutch
         'weigeren',
         'alles weigeren',
+        'niet accepteren',
 
         // Portuguese
         'rejeitar',
         'rejeitar tudo',
+        'não aceitar',
+
+        // Polish
+        'odrzuć',
+        'odrzuć wszystkie',
 
         // Class and ID patterns
         '[class*="reject"]',
         '[class*="decline"]',
         '[class*="deny"]',
+        '[class*="opt-out"]',
         '[id*="reject"]',
         '[id*="decline"]',
-        '[id*="deny"]'
+        '[id*="deny"]',
+        '[id*="opt-out"]'
     ],
 
-    // "Necessary only" / "Essential only" patterns
+    // "Necessary only" / "Essential only" patterns (direct save — no second step)
     necessaryOnlyButtons: [
         'necessary only',
         'essential only',
         'required only',
         'strictly necessary',
-        'save preferences',
-        'confirm my choices',
-        'confirm selection',
+        'only necessary',
+        'only essential',
+        'use necessary',
+        'use essential',
+        'accept necessary',
+        'accept essential',
 
         // Multi-language
         'nur notwendige', // German
+        'nur erforderliche', // German alt
         'nécessaires uniquement', // French
         'solo necesarias', // Spanish
         'solo essenziali', // Italian
         'alleen noodzakelijk', // Dutch
+        'apenas necessários', // Portuguese
 
         '[class*="necessary"]',
-        '[class*="essential"]',
-        '[class*="save-preferences"]'
+        '[class*="essential"]'
+    ],
+
+    // Buttons that SAVE the current toggle selection (used after disabling toggles)
+    saveButtons: [
+        'save preferences',
+        'save settings',
+        'save my preferences',
+        'save and continue',
+        'save and close',
+        'save my choices',
+        'save my selection',
+        'confirm my choices',
+        'confirm choices',
+        'confirm selection',
+        'confirm my selection',
+        'allow selected',
+        'accept selected',
+        'accept selection',
+        'accept current selection',
+        'apply',
+        'apply settings',
+        'submit',
+        'done',
+        'update preferences',
+        'update settings',
+        // Multi-language
+        'einstellungen speichern', // German
+        'auswahl bestätigen',      // German
+        'enregistrer',             // French
+        'guardar preferencias',    // Spanish
+        'salva preferenze',        // Italian
+        'voorkeuren opslaan',      // Dutch
+
+        '[class*="save-preferences"]',
+        '[class*="save-settings"]',
+        '[class*="confirm-selection"]',
+        '[class*="accept-selection"]'
+    ],
+
+    // Buttons that OPEN the preferences panel (two-step flow — step 1)
+    manageButtons: [
+        'manage preferences',
+        'manage cookies',
+        'manage settings',
+        'manage consent',
+        'cookie settings',
+        'privacy settings',
+        'customize',
+        'customise',
+        'more options',
+        'set preferences',
+        'let me choose',
+        'choose cookies',
+        'cookie preferences',
+        'privacy options',
+        'options',
+        // Multi-language
+        'einstellungen',       // German
+        'paramètres',          // French
+        'configurar',          // Spanish
+        'impostazioni',        // Italian
+        'instellingen',        // Dutch
+
+        '[class*="manage"]',
+        '[class*="customize"]',
+        '[class*="settings-toggle"]',
+        '[class*="preferences-toggle"]'
     ],
 
     // Close button patterns
@@ -152,12 +258,15 @@ const COOKIE_SELECTORS = {
 };
 
 // Patterns for identifying high z-index elements (potential popups)
-const HIGH_Z_INDEX_THRESHOLD = window.innerWidth > 999 ? 999 : 9999;
+// Desktop (wider screens) can have lower thresholds; mobile UIs often use higher z-index values
+const HIGH_Z_INDEX_THRESHOLD = window.innerWidth > 999 ? 9999 : 999;
 
 // Common attributes that indicate a cookie banner
 const COOKIE_INDICATORS = {
-    classKeywords: ['cookie', 'consent', 'gdpr', 'privacy', 'banner', 'notice'],
-    idKeywords: ['cookie', 'consent', 'gdpr', 'privacy'],
+    classKeywords: ['cookie', 'consent', 'gdpr', 'privacy', 'banner', 'notice', 'tracking'],
+    idKeywords: ['cookie', 'consent', 'gdpr', 'privacy', 'tracking'],
     ariaLabels: ['cookie', 'consent', 'privacy', 'notice'],
-    buttonTextKeywords: ['reject', 'accept']
+    // Used to detect banners whose body text may not mention "cookie" explicitly
+    // — e.g. a modal that only shows "Allow all" vs "Reject all"
+    buttonTextKeywords: ['reject', 'accept', 'allow all', 'reject all', 'decline', 'deny', 'refuse', 'opt out']
 };

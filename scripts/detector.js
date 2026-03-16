@@ -101,7 +101,23 @@ class CookieBannerDetector {
      */
     detectByKeywords() {
         const banners = [];
-        const candidates = document.querySelectorAll('div[role="dialog"], div[role="alertdialog"], aside, section');
+        // Cast a wide net: semantic dialog roles + common container tags +
+        // any div/nav/footer whose class or id suggests a cookie/consent banner.
+        const candidateSelectors = [
+            'div[role="dialog"]',
+            'div[role="alertdialog"]',
+            'aside',
+            'section',
+            // Divs/navs/footers with cookie/consent/gdpr/privacy in class or id
+            'div[class*="cookie"]', 'div[id*="cookie"]',
+            'div[class*="cookies"]', 'div[id*="cookies"]',
+            'div[class*="consent"]', 'div[id*="consent"]',
+            'div[class*="gdpr"]',   'div[id*="gdpr"]',
+            'div[class*="privacy"]','div[id*="privacy"]',
+            'nav[class*="cookie"]', 'nav[id*="cookie"]',
+            'footer[class*="cookie"]'
+        ].join(', ');
+        const candidates = document.querySelectorAll(candidateSelectors);
 
         candidates.forEach(element => {
             // Skip if already detected
@@ -150,13 +166,43 @@ class CookieBannerDetector {
     }
 
     /**
+     * Check if element has BOTH an accept-type and a reject-type button.
+     * This catches banners like "Allow all" / "Reject all" that may not
+     * mention the word "cookie" anywhere in their body text.
+     */
+    hasAcceptAndRejectButtons(element) {
+        const acceptKeywords = ['accept', 'allow', 'agree', 'got it', 'ok', 'yes', 'enable'];
+        const rejectKeywords = ['reject', 'decline', 'deny', 'refuse', 'no thanks', 'opt out', 'disallow'];
+
+        const buttons = element.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"], [role="button"]');
+        let hasAccept = false;
+        let hasReject = false;
+
+        for (const btn of buttons) {
+            if (!this.isVisible(btn)) continue;
+            const btnText = (
+                btn.innerText || btn.textContent || btn.value ||
+                btn.getAttribute('aria-label') || btn.getAttribute('title') || ''
+            ).toLowerCase().trim();
+
+            if (acceptKeywords.some(kw => btnText.includes(kw))) hasAccept = true;
+            if (rejectKeywords.some(kw => btnText.includes(kw))) hasReject = true;
+
+            if (hasAccept && hasReject) return true;
+        }
+        return false;
+    }
+
+    /**
      * Check if text contains cookie-related keywords
      */
     containsCookieKeywords(text) {
         const cookieKeywords = [
             'cookie', 'cookies', 'consent', 'privacy', 'gdpr',
             'we use cookies', 'this website uses', 'accept cookies',
-            'by continuing', 'data protection'
+            'by continuing', 'data protection', 'personal data',
+            'tracking', 'analytics', 'advertising', 'preferences',
+            'third-party', 'third party', 'targeted'
         ];
 
         return cookieKeywords.some(keyword => text.includes(keyword));
@@ -174,14 +220,19 @@ class CookieBannerDetector {
         if (rect.width < 200 || rect.height < 50) return false;
 
         // Should contain interactive elements (buttons)
-        const hasButtons = element.querySelectorAll('button, a[role="button"], input[type="button"]').length > 0;
+        const hasButtons = element.querySelectorAll('button, a[role="button"], input[type="button"], [role="button"]').length > 0;
         if (!hasButtons) return false;
 
-        // Check text content
         const text = element.innerText.toLowerCase();
-        if (!this.containsCookieKeywords(text)) return false;
 
-        return true;
+        // Primary check: text contains cookie/privacy keywords
+        if (this.containsCookieKeywords(text)) return true;
+
+        // Fallback: banner has both an accept AND a reject button
+        // This catches "Allow all" / "Reject all" modals without cookie keywords
+        if (this.hasAcceptAndRejectButtons(element)) return true;
+
+        return false;
     }
 
     /**

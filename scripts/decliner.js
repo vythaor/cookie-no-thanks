@@ -38,10 +38,19 @@ class CookieDecliner {
         this.processedBanners.add(banner);
         this.logBannerInfo(banner, 'Cookie popup to process');
 
-        const strategyNames = ['clickDeclineButton', 'clickNecessaryOnlyButton', 'clickCloseButton', 'removeDirectly'];
+        const strategyNames = [
+            'clickDeclineButton',
+            'clickNecessaryOnlyButton',
+            'disableTogglesAndSave',
+            'handleManageAndDisableFlow',
+            'clickCloseButton',
+            'removeDirectly'
+        ];
         const strategies = [
             () => this.clickDeclineButton(banner),
             () => this.clickNecessaryOnlyButton(banner),
+            () => this.disableTogglesAndSave(banner),
+            () => this.handleManageAndDisableFlow(banner),
             () => this.clickCloseButton(banner),
             () => this.removeDirectly(banner)
         ];
@@ -138,6 +147,180 @@ class CookieDecliner {
         banner.remove();
         this.stats.closed++;
         return true;
+    }
+
+    // ─── Two-step flow helpers ────────────────────────────────────────────────
+
+    /**
+     * Simple promise-based delay
+     */
+    wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Find the "Manage preferences / Customize" button within a banner.
+     * Deliberately excludes buttons that accept, save, or reject so we
+     * don't accidentally trigger other strategies.
+     */
+    findManageButton(banner) {
+        const skipWords = ['save', 'confirm', 'accept', 'allow', 'reject', 'decline', 'deny', 'refuse', 'close', 'dismiss'];
+        const buttons = banner.querySelectorAll('button, a[role="button"], [role="button"]');
+
+        for (const btn of buttons) {
+            if (!this.isVisible(btn)) continue;
+
+            const text = (
+                btn.innerText || btn.textContent ||
+                btn.getAttribute('aria-label') || btn.getAttribute('title') || ''
+            ).toLowerCase().trim();
+
+            // Skip if it looks like an accept / save / reject action
+            if (skipWords.some(w => text.includes(w))) continue;
+
+            const matchesManage = COOKIE_SELECTORS.manageButtons.some(pattern => {
+                if (pattern.startsWith('[')) {
+                    try { return btn.matches(pattern); } catch { return false; }
+                }
+                return text.includes(pattern.toLowerCase());
+            });
+
+            // Also catch collapsed expanders (aria-expanded="false") even if text didn't match
+            const isCollapsedToggler = btn.getAttribute('aria-expanded') === 'false';
+
+            if (matchesManage || isCollapsedToggler) {
+                console.log('[Cookie Auto Decliner] Found manage/customize button:', {
+                    text: text.slice(0, 60),
+                    tag: btn.tagName,
+                    id: btn.id || '(no id)'
+                });
+                return btn;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Uncheck all opt-in checkboxes and disable aria-checked toggle switches.
+     * Skips disabled inputs (which are typically for strictly necessary cookies).
+     * Returns true if any toggle was changed.
+     */
+    disableAllToggles(container) {
+        let disabledAny = false;
+
+        // Standard checkboxes
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+        for (const cb of checkboxes) {
+            if (cb.disabled) continue; // essential — can't opt out
+            if (cb.checked) {
+                cb.click();
+                disabledAny = true;
+                console.log('[Cookie Auto Decliner] Unchecked checkbox:', cb.id || cb.name || '(unnamed)');
+            }
+        }
+
+        // Custom ARIA toggle switches
+        const ariaToggles = container.querySelectorAll(
+            '[role="switch"][aria-checked="true"], [role="checkbox"][aria-checked="true"]'
+        );
+        for (const toggle of ariaToggles) {
+            if (!this.isVisible(toggle)) continue;
+            // Skip if it looks like an essential / required toggle (often labelled)
+            const label = (toggle.getAttribute('aria-label') || toggle.textContent || '').toLowerCase();
+            const isEssential = ['essential', 'necessary', 'required', 'strictly'].some(w => label.includes(w));
+            if (isEssential) continue;
+
+            toggle.click();
+            disabledAny = true;
+            console.log('[Cookie Auto Decliner] Disabled ARIA toggle:', label.slice(0, 60) || '(unlabelled)');
+        }
+
+        return disabledAny;
+    }
+
+    /**
+     * Find a save/confirm button using the saveButtons pattern list.
+     * Searches the given container; falls back to document.body.
+     */
+    findSaveButton(container) {
+        const { button } = this.findButtonWithPattern(container, COOKIE_SELECTORS.saveButtons);
+        if (button) return button;
+        // Widen search if not found inside the banner
+        if (container !== document.body) {
+            const { button: bodyBtn } = this.findButtonWithPattern(document.body, COOKIE_SELECTORS.saveButtons);
+            return bodyBtn;
+        }
+        return null;
+    }
+
+    /**
+     * Strategy 3: If the banner already has visible (or aria-hidden) toggles,
+     * disable them all and click the save button.
+     * Handles inline expansion patterns (the toggles are in the DOM but hidden).
+     */
+    async disableTogglesAndSave(banner) {
+        // Search including aria-hidden children (they may be toggled visible later)
+        const disabledAny = this.disableAllToggles(banner);
+        if (!disabledAny) return false;
+
+        await this.wait(200);
+
+        const saveBtn = this.findSaveButton(banner);
+        if (saveBtn) {
+            console.log('[Cookie Auto Decliner] Clicking save button after disabling inline toggles');
+            this.simulateClick(saveBtn);
+            return true;
+        }
+
+        console.log('[Cookie Auto Decliner] Disabled toggles but no save button found yet (will try manage flow next)');
+        return false;
+    }
+
+    /**
+     * Strategy 4: Click the "Manage preferences" button, wait for the panel
+     * to appear, disable all opt-in toggles, then click save.
+     * Also re-runs disableAllToggles on document.body to catch panels injected
+     * outside the original banner element.
+     */
+    async handleManageAndDisableFlow(banner) {
+        const manageBtn = this.findManageButton(banner);
+        if (!manageBtn) {
+            console.log('[Cookie Auto Decliner] No manage button found, skipping two-step flow');
+            return false;
+        }
+
+        console.log('[Cookie Auto Decliner] Clicking manage/customize button to expand preferences panel');
+        this.simulateClick(manageBtn);
+
+        // Wait for the panel to expand / be injected into the DOM
+        await this.wait(700);
+
+        // Disable toggles — check inside banner first, then full page
+        let disabledAny = this.disableAllToggles(banner);
+        if (!disabledAny) {
+            disabledAny = this.disableAllToggles(document.body);
+        }
+
+        if (disabledAny) {
+            await this.wait(200);
+        }
+
+        // Look for a save button — inside banner, then full page
+        const saveBtn = this.findSaveButton(banner);
+        if (saveBtn) {
+            console.log('[Cookie Auto Decliner] Clicking save button after manage + disable flow');
+            this.simulateClick(saveBtn);
+            return true;
+        }
+
+        // If we at least disabled some toggles, consider it a partial win
+        // (the page's own periodic save may pick up the unchecked state)
+        if (disabledAny) {
+            console.log('[Cookie Auto Decliner] Disabled toggles via manage flow (no save button found)');
+            return true;
+        }
+
+        return false;
     }
 
     /**
