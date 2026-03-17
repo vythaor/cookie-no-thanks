@@ -168,7 +168,9 @@ class CookieDecliner {
         const buttons = banner.querySelectorAll('button, a[role="button"], [role="button"]');
 
         for (const btn of buttons) {
-            if (!this.isVisible(btn)) continue;
+            // Don't use isVisible() here — buttons inside a visibility:hidden container
+            // inherit that property and would all be rejected. Only skip display:none.
+            if (window.getComputedStyle(btn).display === 'none') continue;
 
             const text = (
                 btn.innerText || btn.textContent ||
@@ -334,7 +336,9 @@ class CookieDecliner {
             const buttons = banner.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]');
 
             for (const button of buttons) {
-                if (!this.isVisible(button)) continue;
+                // Don't use isVisible() — buttons inside a visibility:hidden banner
+                // inherit that style and would all be skipped. Only exclude display:none.
+                if (window.getComputedStyle(button).display === 'none') continue;
 
                 const rawText = (button.innerText ?? button.textContent ?? button.value ?? '').toString();
                 const buttonText = rawText.toLowerCase().trim();
@@ -361,7 +365,7 @@ class CookieDecliner {
                 if (typeof pattern === 'string' && pattern.startsWith('[')) {
                     try {
                         const element = banner.querySelector(pattern);
-                        if (element && this.isVisible(element)) {
+                        if (element && window.getComputedStyle(element).display !== 'none') {
                             console.log('[Cookie Auto Decliner] Pattern matched (selector):', { pattern });
                             return { button: element, matchedPattern: pattern };
                         }
@@ -415,7 +419,14 @@ class CookieDecliner {
 
         const style = window.getComputedStyle(element);
         if (style.display === 'none') return false;
-        if (style.visibility === 'hidden') return false;
+
+        // Some consent modals (e.g. slide-in banners) use visibility:hidden as the animation
+        // start state while still being aria-accessible (aria-hidden="false").  Honour that
+        // explicit accessibility signal and don't treat such elements as invisible.
+        const ariaHiddenAttr = element.getAttribute('aria-hidden');
+        const explicitlyAriaVisible = ariaHiddenAttr === 'false';
+        if (style.visibility === 'hidden' && !explicitlyAriaVisible) return false;
+
         if (style.opacity === '0') return false;
 
         const rect = element.getBoundingClientRect();

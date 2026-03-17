@@ -84,7 +84,8 @@ class CookieBannerDetector {
             const zIndex = parseInt(window.getComputedStyle(element).zIndex);
 
             if (zIndex >= HIGH_Z_INDEX_THRESHOLD) {
-                const text = element.innerText.toLowerCase();
+                // innerText returns "" for visibility:hidden elements; textContent is layout-agnostic
+                const text = (element.innerText || element.textContent || '').toLowerCase();
 
                 if (this.containsCookieKeywords(text)) {
                     this.logDetectedBanner(element, 'z-index', { zIndex });
@@ -106,6 +107,10 @@ class CookieBannerDetector {
         const candidateSelectors = [
             'div[role="dialog"]',
             'div[role="alertdialog"]',
+            // aria-modal dialogs that are explicitly NOT aria-hidden (e.g. slide-in consent modals
+            // that use visibility:hidden during their CSS animation — aria-hidden="false" signals
+            // the element IS presented to the user even if visibility hasn't transitioned yet)
+            '[aria-modal="true"][aria-hidden="false"]',
             'aside',
             'section',
             // Divs/navs/footers with cookie/consent/gdpr/privacy in class or id
@@ -123,7 +128,8 @@ class CookieBannerDetector {
             // Skip if already detected
             if (this.detectedBanners.has(element)) return;
 
-            const text = element.innerText.toLowerCase();
+            // innerText returns "" for visibility:hidden elements; textContent is layout-agnostic
+            const text = (element.innerText || element.textContent || '').toLowerCase();
             const className = element.className.toLowerCase();
             const id = element.id.toLowerCase();
 
@@ -179,7 +185,13 @@ class CookieBannerDetector {
         let hasReject = false;
 
         for (const btn of buttons) {
-            if (!this.isVisible(btn)) continue;
+            // NOTE: we intentionally skip the isVisible() check here. Child buttons inside a
+            // visibility:hidden container inherit that style, so isVisible() would reject them
+            // all even though the banner itself was already validated as accessible.
+            // We only exclude buttons that are explicitly display:none.
+            if (window.getComputedStyle(btn).display === 'none') continue;
+
+            // Use textContent as fallback since innerText returns "" for hidden elements
             const btnText = (
                 btn.innerText || btn.textContent || btn.value ||
                 btn.getAttribute('aria-label') || btn.getAttribute('title') || ''
@@ -223,7 +235,8 @@ class CookieBannerDetector {
         const hasButtons = element.querySelectorAll('button, a[role="button"], input[type="button"], [role="button"]').length > 0;
         if (!hasButtons) return false;
 
-        const text = element.innerText.toLowerCase();
+        // innerText returns "" for visibility:hidden elements; use textContent as fallback
+        const text = (element.innerText || element.textContent || '').toLowerCase();
 
         // Primary check: text contains cookie/privacy keywords
         if (this.containsCookieKeywords(text)) return true;
@@ -245,7 +258,15 @@ class CookieBannerDetector {
 
         // Check display and visibility
         if (style.display === 'none') return false;
-        if (style.visibility === 'hidden') return false;
+
+        // Some cookie banners (e.g. slide-in modals) start with visibility:hidden as part of a
+        // CSS transition and only become visible:visible once the animation fires.  If the
+        // site has explicitly set aria-hidden="false" it is signalling that the element IS
+        // presented to the user, so we should not reject it on visibility alone.
+        const ariaHiddenAttr = element.getAttribute('aria-hidden');
+        const explicitlyAriaVisible = ariaHiddenAttr === 'false';
+        if (style.visibility === 'hidden' && !explicitlyAriaVisible) return false;
+
         if (style.opacity === '0') return false;
 
         // Check if element has dimensions

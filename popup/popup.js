@@ -2,7 +2,6 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     const enableToggle = document.getElementById('enableToggle');
-    const manualTrigger = document.getElementById('manualTrigger');
     const openOptions = document.getElementById('openOptions');
 
     await loadSettings();
@@ -14,29 +13,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             await chrome.storage.sync.set({ enabled });
             const tabs = await chrome.tabs.query({});
             tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_ENABLED', enabled }).catch(() => {}));
-        });
-    }
-
-    if (manualTrigger) {
-        manualTrigger.addEventListener('click', async () => {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab?.id) {
-                resetButton();
-                return;
-            }
-            manualTrigger.disabled = true;
-            manualTrigger.textContent = 'Scanning...';
-
-            chrome.tabs.sendMessage(tab.id, { type: 'MANUAL_TRIGGER' }, () => {
-                if (chrome.runtime.lastError) {
-                    resetButton();
-                    return;
-                }
-                setTimeout(() => {
-                    updateStatus();
-                    resetButton();
-                }, 1500);
-            });
         });
     }
 
@@ -100,10 +76,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function resetButton() {
-        if (manualTrigger) {
-            manualTrigger.disabled = false;
-            manualTrigger.textContent = 'RESCAN';
-        }
-    }
 });

@@ -71,7 +71,12 @@ const COOKIE_SELECTORS = {
         // ARIA and semantic patterns
         '[role="dialog"][aria-label*="cookie" i]',
         '[role="dialog"][aria-label*="consent" i]',
-        '[role="dialog"][aria-label*="privacy" i]'
+        '[role="dialog"][aria-label*="privacy" i]',
+
+        // Dialogs that are explicitly accessible (aria-hidden="false") and modal — common in
+        // slide-in / animated consent banners (e.g. drimify.com #cm) where visibility:hidden
+        // is used as the CSS animation start state rather than a true hide signal.
+        '[aria-modal="true"][aria-hidden="false"]'
     ],
 
     // Decline/Reject button patterns
