@@ -82,12 +82,11 @@ class CookieBannerDetector {
 
         allElements.forEach(element => {
             const zIndex = parseInt(window.getComputedStyle(element).zIndex);
+            const text = (element.innerText || element.textContent || '').toLowerCase();
 
-            if (zIndex >= HIGH_Z_INDEX_THRESHOLD) {
-                // innerText returns "" for visibility:hidden elements; textContent is layout-agnostic
-                const text = (element.innerText || element.textContent || '').toLowerCase();
-
-                if (this.containsCookieKeywords(text)) {
+            if (zIndex >= HIGH_Z_INDEX_THRESHOLD && this.containsCookieKeywords(text)) {
+                const rect = element.getBoundingClientRect();
+                if (rect.width >= 200 && rect.height >= 50) {
                     this.logDetectedBanner(element, 'z-index', { zIndex });
                     banners.push(element);
                 }
@@ -117,8 +116,8 @@ class CookieBannerDetector {
             'div[class*="cookie"]', 'div[id*="cookie"]',
             'div[class*="cookies"]', 'div[id*="cookies"]',
             'div[class*="consent"]', 'div[id*="consent"]',
-            'div[class*="gdpr"]',   'div[id*="gdpr"]',
-            'div[class*="privacy"]','div[id*="privacy"]',
+            'div[class*="gdpr"]', 'div[id*="gdpr"]',
+            'div[class*="privacy"]', 'div[id*="privacy"]',
             'nav[class*="cookie"]', 'nav[id*="cookie"]',
             'footer[class*="cookie"]'
         ].join(', ');
@@ -139,8 +138,7 @@ class CookieBannerDetector {
             // Check for cookie keywords in attributes or button text (reject/accept)
             const hasCookieAttributes =
                 COOKIE_INDICATORS.classKeywords.some(keyword => className.includes(keyword)) ||
-                COOKIE_INDICATORS.idKeywords.some(keyword => id.includes(keyword)) ||
-                this.hasButtonsWithConsentText(element);
+                COOKIE_INDICATORS.idKeywords.some(keyword => id.includes(keyword));
 
             if ((hasCookieText && text.length > 20) || hasCookieAttributes) {
                 if (this.isLikelyCookieBanner(element)) {
@@ -177,7 +175,7 @@ class CookieBannerDetector {
      * mention the word "cookie" anywhere in their body text.
      */
     hasAcceptAndRejectButtons(element) {
-        const acceptKeywords = ['accept', 'allow', 'agree', 'got it', 'ok', 'yes', 'enable'];
+        const acceptKeywords = ['accept all', 'allow all', 'agree to all', 'accept cookies', 'allow cookies'];
         const rejectKeywords = ['reject', 'decline', 'deny', 'refuse', 'no thanks', 'opt out', 'disallow'];
 
         const buttons = element.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"], [role="button"]');
@@ -228,8 +226,11 @@ class CookieBannerDetector {
         if (!this.isVisible(element)) return false;
 
         // Should have reasonable size
+        // Use offsetWidth/offsetHeight as fallback for visibility:hidden elements
         const rect = element.getBoundingClientRect();
-        if (rect.width < 200 || rect.height < 50) return false;
+        const w = rect.width || element.offsetWidth;
+        const h = rect.height || element.offsetHeight;
+        if (w < 200 || h < 50) return false;
 
         // Should contain interactive elements (buttons)
         const hasButtons = element.querySelectorAll('button, a[role="button"], input[type="button"], [role="button"]').length > 0;
@@ -245,6 +246,8 @@ class CookieBannerDetector {
         // This catches "Allow all" / "Reject all" modals without cookie keywords
         if (this.hasAcceptAndRejectButtons(element)) return true;
 
+        if (this.hasButtonsWithConsentText(element)) return true;
+
         return false;
     }
 
@@ -253,25 +256,27 @@ class CookieBannerDetector {
      */
     isVisible(element) {
         if (!element) return false;
-
         const style = window.getComputedStyle(element);
 
-        // Check display and visibility
         if (style.display === 'none') return false;
 
-        // Some cookie banners (e.g. slide-in modals) start with visibility:hidden as part of a
-        // CSS transition and only become visible:visible once the animation fires.  If the
-        // site has explicitly set aria-hidden="false" it is signalling that the element IS
-        // presented to the user, so we should not reject it on visibility alone.
         const ariaHiddenAttr = element.getAttribute('aria-hidden');
         const explicitlyAriaVisible = ariaHiddenAttr === 'false';
-        if (style.visibility === 'hidden' && !explicitlyAriaVisible) return false;
+
+        if (style.visibility === 'hidden' && !explicitlyAriaVisible) {
+            // Don't reject outright — if it has real layout dimensions it may be
+            // a banner animating in (e.g. CSS transition from hidden → visible)
+            const w = element.offsetWidth;
+            const h = element.offsetHeight;
+            if (w < 200 || h < 50) return false;
+            // Fall through — treat as visible if it has real size
+        }
 
         if (style.opacity === '0') return false;
 
-        // Check if element has dimensions
         const rect = element.getBoundingClientRect();
-        if (rect.width === 0 || rect.height === 0) return false;
+        if (rect.width === 0 && element.offsetWidth === 0) return false;
+        if (rect.height === 0 && element.offsetHeight === 0) return false;
 
         return true;
     }
@@ -281,19 +286,21 @@ class CookieBannerDetector {
      */
     removeDuplicates(banners) {
         const unique = [];
-
         banners.forEach(banner => {
-            // Check if this banner is a child of any existing banner
-            const isChild = unique.some(existing => existing.contains(banner));
-
-            if (!isChild) {
-                // Remove any existing banners that are children of this one
-                const filtered = unique.filter(existing => !banner.contains(existing));
+            const isChild = unique.some(e => e.contains(banner));
+            // Only deduplicate siblings if they share a cookie-related class name,
+            // preventing legitimate nested panels from being dropped
+            const isSiblingDuplicate = unique.some(e =>
+                e.parentElement === banner.parentElement &&
+                e !== banner &&
+                e.className === banner.className  // same component, different instance
+            );
+            if (!isChild && !isSiblingDuplicate) {
+                const filtered = unique.filter(e => !banner.contains(e));
                 unique.length = 0;
                 unique.push(...filtered, banner);
             }
         });
-
         return unique;
     }
 
