@@ -74,72 +74,68 @@ const COOKIE_SELECTORS = {
         '[role="dialog"][aria-label*="privacy" i]',
 
         // Dialogs that are explicitly accessible (aria-hidden="false") and modal — common in
-        // slide-in / animated consent banners (e.g. drimify.com #cm) where visibility:hidden
-        // is used as the CSS animation start state rather than a true hide signal.
+        // slide-in / animated consent banners where visibility:hidden is used as the CSS
+        // animation start state rather than a true hide signal.
         '[aria-modal="true"][aria-hidden="false"]'
     ],
 
-    // Decline/Reject button patterns
+    // Decline/Reject button patterns — ordered by specificity (most specific first)
     declineButtons: [
-        // Direct text matching (will be used with contains selector)
+        // === PRIORITY 1: Explicit "reject all / decline all" ===
         'reject all',
-        'reject',
         'decline all',
-        'decline',
         'deny all',
-        'deny',
         'refuse all',
+        'disallow all',
+        // Multi-language "reject all"
+        'alle ablehnen',        // German
+        'tout refuser',         // French
+        'rechazar todo',        // Spanish
+        'rifiuta tutto',        // Italian
+        'alles weigeren',       // Dutch
+        'rejeitar tudo',        // Portuguese
+        'odrzuć wszystkie',     // Polish
+
+        // === PRIORITY 2: "Decline non-required / non-essential" ===
+        'decline non-required',
+        'decline non-essential',
+        'reject non-required',
+        'reject non-essential',
+
+        // === PRIORITY 3: Plain reject/decline (no "all" qualifier) ===
+        'reject',
+        'decline',
+        'deny',
         'refuse',
         'no thanks',
         'no, thanks',
-        'dismiss',
         'do not accept',
-        'don\'t accept',
+        "don't accept",
         'do not allow',
-        'don\'t allow',
+        "don't allow",
         'not now',
         'disallow',
         'opt out',
         'opt-out',
+        'dismiss',
+        // Multi-language plain reject
+        'ablehnen',             // German
+        'nicht akzeptieren',    // German alt
+        'refuser',              // French
+        'rejeter',              // French alt
+        'je refuse',            // French alt
+        'rechazar',             // Spanish
+        'denegar',              // Spanish alt
+        'no aceptar',           // Spanish alt
+        'rifiuta',              // Italian
+        'non accettare',        // Italian alt
+        'weigeren',             // Dutch
+        'niet accepteren',      // Dutch alt
+        'rejeitar',             // Portuguese
+        'não aceitar',          // Portuguese alt
+        'odrzuć',               // Polish
 
-        // Multi-language support
-        // German
-        'ablehnen',
-        'alle ablehnen',
-        'nicht akzeptieren',
-
-        // French
-        'refuser',
-        'tout refuser',
-        'rejeter',
-        'je refuse',
-
-        // Spanish
-        'rechazar',
-        'rechazar todo',
-        'denegar',
-        'no aceptar',
-
-        // Italian
-        'rifiuta',
-        'rifiuta tutto',
-        'non accettare',
-
-        // Dutch
-        'weigeren',
-        'alles weigeren',
-        'niet accepteren',
-
-        // Portuguese
-        'rejeitar',
-        'rejeitar tudo',
-        'não aceitar',
-
-        // Polish
-        'odrzuć',
-        'odrzuć wszystkie',
-
-        // Class and ID patterns
+        // Class/ID attribute patterns
         '[class*="reject"]',
         '[class*="decline"]',
         '[class*="deny"]',
@@ -162,15 +158,19 @@ const COOKIE_SELECTORS = {
         'use essential',
         'accept necessary',
         'accept essential',
-
+        'accept only necessary',
+        'accept only essential',
+        'continue without accepting',
+        'continue without agreeing',
+        'continue without consent',
         // Multi-language
-        'nur notwendige', // German
-        'nur erforderliche', // German alt
-        'nécessaires uniquement', // French
-        'solo necesarias', // Spanish
-        'solo essenziali', // Italian
-        'alleen noodzakelijk', // Dutch
-        'apenas necessários', // Portuguese
+        'nur notwendige',           // German
+        'nur erforderliche',        // German alt
+        'nécessaires uniquement',   // French
+        'solo necesarias',          // Spanish
+        'solo essenziali',          // Italian
+        'alleen noodzakelijk',      // Dutch
+        'apenas necessários',       // Portuguese
 
         '[class*="necessary"]',
         '[class*="essential"]'
@@ -200,12 +200,12 @@ const COOKIE_SELECTORS = {
         'update preferences',
         'update settings',
         // Multi-language
-        'einstellungen speichern', // German
-        'auswahl bestätigen',      // German
-        'enregistrer',             // French
-        'guardar preferencias',    // Spanish
-        'salva preferenze',        // Italian
-        'voorkeuren opslaan',      // Dutch
+        'einstellungen speichern',  // German
+        'auswahl bestätigen',       // German
+        'enregistrer',              // French
+        'guardar preferencias',     // Spanish
+        'salva preferenze',         // Italian
+        'voorkeuren opslaan',       // Dutch
 
         '[class*="save-preferences"]',
         '[class*="save-settings"]',
@@ -219,6 +219,7 @@ const COOKIE_SELECTORS = {
         'manage cookies',
         'manage settings',
         'manage consent',
+        'manage options',
         'cookie settings',
         'privacy settings',
         'customize',
@@ -231,11 +232,11 @@ const COOKIE_SELECTORS = {
         'privacy options',
         'options',
         // Multi-language
-        'einstellungen',       // German
-        'paramètres',          // French
-        'configurar',          // Spanish
-        'impostazioni',        // Italian
-        'instellingen',        // Dutch
+        'einstellungen',            // German
+        'paramètres',               // French
+        'configurar',               // Spanish
+        'impostazioni',             // Italian
+        'instellingen',             // Dutch
 
         '[class*="manage"]',
         '[class*="customize"]',

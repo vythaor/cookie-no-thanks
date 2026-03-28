@@ -25,32 +25,60 @@ class CookieDecliner {
     }
 
     /**
-     * Main function to decline cookies in a banner
+     * Main function to decline cookies in a banner.
+     *
+     * Strategy priority order (each tried in sequence, stops on first success):
+     *   1. clickRejectAllButton       — "Reject all" / "Decline all" (most explicit)
+     *   2. clickNecessaryOnlyButton   — "Accept necessary only" / "Essential only"
+     *   3. clickDeclineButton         — plain "Reject" / "Decline" (no "all" qualifier)
+     *   4. handleManageAndDisableFlow — open settings, disable all toggles, save
+     *   5. handlePayOrAcceptBanner    — pay-wall scenario: click Accept (not pay)
+     *   6. clickAcceptAsLastResort    — only one button and it accepts (no alternative)
+     *   7. disableTogglesAndSave      — toggles already visible inline, disable + save
+     *   8. clickCloseButton           — close/dismiss button
+     *   9. removeDirectly             — DOM removal (last resort)
+     *
      * @param {HTMLElement} banner - The detected banner element
-     * @returns {boolean} - True if successfully declined
+     * @returns {boolean} - True if successfully handled
      */
     async declineCookies(banner) {
         if (this.processedBanners.has(banner)) {
             console.log('[Cookie Auto Decliner] Skipping already processed banner');
             return false;
         }
-        console.log('declined cookie', banner);
         this.processedBanners.add(banner);
         this.logBannerInfo(banner, 'Cookie popup to process');
 
+        // Pre-classify all buttons once — shared by multiple strategies below
+        const classified = cookieBannerDetector.classifyButtons(banner);
+        console.log('[Cookie Auto Decliner] Button classification:', {
+            rejectAll: classified.rejectAllButtons.map(b => this.btnLabel(b)),
+            necessary: classified.necessaryButtons.map(b => this.btnLabel(b)),
+            reject: classified.rejectButtons.map(b => this.btnLabel(b)),
+            manage: classified.manageButtons.map(b => this.btnLabel(b)),
+            accept: classified.acceptButtons.map(b => this.btnLabel(b)),
+            pay: classified.payButtons.map(b => this.btnLabel(b))
+        });
+
         const strategyNames = [
-            'clickDeclineButton',
+            'clickRejectAllButton',
             'clickNecessaryOnlyButton',
-            'disableTogglesAndSave',
+            'clickDeclineButton',
             'handleManageAndDisableFlow',
+            'handlePayOrAcceptBanner',
+            'clickAcceptAsLastResort',
+            'disableTogglesAndSave',
             'clickCloseButton',
             'removeDirectly'
         ];
         const strategies = [
-            () => this.clickDeclineButton(banner),
-            () => this.clickNecessaryOnlyButton(banner),
+            () => this.clickRejectAllButton(banner, classified),
+            () => this.clickNecessaryOnlyButton(banner, classified),
+            () => this.clickDeclineButton(banner, classified),
+            () => this.handleManageAndDisableFlow(banner, classified),
+            () => this.handlePayOrAcceptBanner(banner, classified),
+            () => this.clickAcceptAsLastResort(banner, classified),
             () => this.disableTogglesAndSave(banner),
-            () => this.handleManageAndDisableFlow(banner),
             () => this.clickCloseButton(banner),
             () => this.removeDirectly(banner)
         ];
@@ -63,8 +91,7 @@ class CookieDecliner {
                     this.removeOverlays();
                     this.restorePageScroll();
                     console.log('[Cookie Auto Decliner] Strategy succeeded:', strategyNames[i]);
-                    console.log('[Cookie Auto Decliner] Cookie banner declined successfully');
-                    console.log('[Cookie Auto Decliner] If the cookie popup is still visible, the site may not have reacted to the click.');
+                    console.log('[Cookie Auto Decliner] Cookie banner handled successfully');
                     return true;
                 }
             } catch (error) {
@@ -77,19 +104,69 @@ class CookieDecliner {
     }
 
     /**
-     * Try to find and click a "Decline/Reject" button
+     * Short readable label for a button element (used in logging)
      */
-    clickDeclineButton(banner) {
+    btnLabel(btn) {
+        return (btn.innerText || btn.textContent || btn.value || btn.getAttribute('aria-label') || '').trim().slice(0, 40);
+    }
+
+    // ─── Strategy 1: Reject All ───────────────────────────────────────────────
+
+    /**
+     * Click the most explicit rejection button ("Reject all", "Decline all", etc.)
+     * This is the highest-priority strategy — always preferred over plain "Reject".
+     */
+    clickRejectAllButton(banner, classified) {
+        const btn = classified.rejectAllButtons[0];
+        if (!btn) return false;
+
+        console.log('[Cookie Auto Decliner] Clicking "Reject all" button:', this.btnLabel(btn));
+        this.simulateClick(btn);
+        return true;
+    }
+
+    // ─── Strategy 2: Necessary Only ──────────────────────────────────────────
+
+    /**
+     * Click "Accept necessary only" / "Essential only" — saves without opt-in cookies.
+     */
+    clickNecessaryOnlyButton(banner, classified) {
+        const btn = classified.necessaryButtons[0];
+        if (!btn) {
+            // Also check via COOKIE_SELECTORS pattern list as a secondary scan
+            const { button, matchedPattern } = this.findButtonWithPattern(banner, COOKIE_SELECTORS.necessaryOnlyButtons);
+            if (!button) return false;
+            console.log('[Cookie Auto Decliner] Clicking necessary-only button (pattern):', matchedPattern);
+            this.simulateClick(button);
+            return true;
+        }
+
+        console.log('[Cookie Auto Decliner] Clicking necessary-only button:', this.btnLabel(btn));
+        this.simulateClick(btn);
+        return true;
+    }
+
+    // ─── Strategy 3: Plain Decline/Reject ────────────────────────────────────
+
+    /**
+     * Click a plain "Reject" / "Decline" button that is not "Reject all".
+     * Only runs after strategies 1 and 2 have already failed — avoids accidentally
+     * clicking a "Decline" button that only applies to a subset of cookies when
+     * a "Decline all" or "Necessary only" option was available.
+     */
+    clickDeclineButton(banner, classified) {
+        // Try classifyButtons result first (fast path)
+        const btn = classified.rejectButtons[0];
+        if (btn) {
+            console.log('[Cookie Auto Decliner] Clicking reject/decline button:', this.btnLabel(btn));
+            this.simulateClick(btn);
+            return true;
+        }
+
+        // Fall back to full COOKIE_SELECTORS pattern scan (catches selector-based patterns)
         const { button, matchedPattern } = this.findButtonWithPattern(banner, COOKIE_SELECTORS.declineButtons);
         if (button) {
-            const btnText = (button.innerText || button.textContent || button.value || '').trim().slice(0, 60);
-            console.log('[Cookie Auto Decliner] Reject button clicked:', {
-                matchedPattern,
-                buttonText: btnText,
-                tag: button.tagName,
-                id: button.id || '(no id)',
-                class: (button.className && String(button.className).slice(0, 60)) || '(no class)'
-            });
+            console.log('[Cookie Auto Decliner] Clicking decline button (pattern):', matchedPattern);
             this.simulateClick(button);
             return true;
         }
@@ -97,32 +174,136 @@ class CookieDecliner {
         return false;
     }
 
+    // ─── Strategy 4: Manage → Disable toggles → Save ─────────────────────────
+
     /**
-     * Try to find and click a "Necessary Only" button
+     * Click the "Manage preferences" button, wait for the panel to appear,
+     * then check for a "Reject all" inside the panel first. If not found,
+     * disable all opt-in toggles and click Save.
+     *
+     * Also re-runs disableAllToggles on document.body to catch panels that are
+     * injected outside the original banner element.
      */
-    clickNecessaryOnlyButton(banner) {
-        const { button, matchedPattern } = this.findButtonWithPattern(banner, COOKIE_SELECTORS.necessaryOnlyButtons);
+    async handleManageAndDisableFlow(banner, classified) {
+        const manageBtn = classified.manageButtons[0] || this.findManageButton(banner);
+        if (!manageBtn) {
+            console.log('[Cookie Auto Decliner] No manage button found, skipping two-step flow');
+            return false;
+        }
 
-        if (button) {
-            const btnText = (button.innerText || button.textContent || button.value || '').trim().slice(0, 60);
-            console.log('[Cookie Auto Decliner] Necessary-only button clicked:', {
-                matchedPattern,
-                buttonText: btnText
-            });
-            this.simulateClick(button);
+        console.log('[Cookie Auto Decliner] Clicking manage/customize button:', this.btnLabel(manageBtn));
+        this.simulateClick(manageBtn);
+
+        // Wait for the panel to expand / be injected into the DOM
+        await this.wait(700);
+
+        // Re-classify after the panel has opened — a "Reject all" button may now be visible
+        const panelClassified = cookieBannerDetector.classifyButtons(document.body);
+        if (panelClassified.rejectAllButtons.length > 0) {
+            const rejectAllInPanel = panelClassified.rejectAllButtons[0];
+            console.log('[Cookie Auto Decliner] Found "Reject all" inside expanded panel:', this.btnLabel(rejectAllInPanel));
+            this.simulateClick(rejectAllInPanel);
+            return true;
+        }
+
+        // No "Reject all" inside the panel — disable all toggles then save
+        let disabledAny = this.disableAllToggles(banner);
+        if (!disabledAny) {
+            disabledAny = this.disableAllToggles(document.body);
+        }
+
+        if (disabledAny) {
+            await this.wait(200);
+        }
+
+        const saveBtn = this.findSaveButton(banner);
+        if (saveBtn) {
+            console.log('[Cookie Auto Decliner] Clicking save button after manage + disable flow');
+            this.simulateClick(saveBtn);
+            return true;
+        }
+
+        // Partial win: toggles disabled but no save button found
+        if (disabledAny) {
+            console.log('[Cookie Auto Decliner] Disabled toggles via manage flow (no save button found)');
             return true;
         }
 
         return false;
     }
 
+    // ─── Strategy 5: Pay-wall or Accept ──────────────────────────────────────
+
     /**
-     * Try to find and click a close button
+     * Handle banners that offer "Pay / Subscribe" alongside "Accept" with no reject option.
+     * In this scenario, Accept is the lesser-tracking choice (no payment data collected).
+     * Logs a warning so the user knows Accept was chosen due to no available reject path.
+     */
+    handlePayOrAcceptBanner(banner, classified) {
+        if (!cookieBannerDetector.isPayOrAcceptBanner(classified)) return false;
+
+        const acceptBtn = classified.acceptButtons[0];
+        if (!acceptBtn) return false;
+
+        console.warn('[Cookie Auto Decliner] Pay-or-accept banner detected. No reject option available — clicking Accept (not Subscribe/Pay).');
+        this.simulateClick(acceptBtn);
+        return true;
+    }
+
+    // ─── Strategy 6: Accept as absolute last resort ───────────────────────────
+
+    /**
+     * If the banner has only a single button and it is an Accept-type, click it.
+     * This is a last-resort path for banners that give no privacy choice at all.
+     */
+    clickAcceptAsLastResort(banner, classified) {
+        const totalActionable =
+            classified.rejectAllButtons.length +
+            classified.rejectButtons.length +
+            classified.necessaryButtons.length +
+            classified.manageButtons.length +
+            classified.payButtons.length;
+
+        // Only fire if there is genuinely no other option
+        if (totalActionable > 0) return false;
+        if (classified.acceptButtons.length === 0) return false;
+
+        const acceptBtn = classified.acceptButtons[0];
+        console.warn('[Cookie Auto Decliner] No reject option found — clicking Accept as last resort:', this.btnLabel(acceptBtn));
+        this.simulateClick(acceptBtn);
+        return true;
+    }
+
+    // ─── Strategy 7: Disable inline toggles → Save ───────────────────────────
+
+    /**
+     * If the banner already exposes toggles inline (without a manage step),
+     * disable them all and click the save button.
+     */
+    async disableTogglesAndSave(banner) {
+        const disabledAny = this.disableAllToggles(banner);
+        if (!disabledAny) return false;
+
+        await this.wait(200);
+
+        const saveBtn = this.findSaveButton(banner);
+        if (saveBtn) {
+            console.log('[Cookie Auto Decliner] Clicking save button after disabling inline toggles');
+            this.simulateClick(saveBtn);
+            return true;
+        }
+
+        console.log('[Cookie Auto Decliner] Disabled inline toggles but no save button found');
+        return false;
+    }
+
+    // ─── Strategy 8: Close button ─────────────────────────────────────────────
+
+    /**
+     * Try to find and click a close/dismiss button.
      */
     clickCloseButton(banner) {
-        const closeSelectors = COOKIE_SELECTORS.closeButtons;
-
-        for (const selector of closeSelectors) {
+        for (const selector of COOKIE_SELECTORS.closeButtons) {
             try {
                 const button = banner.querySelector(selector);
                 if (button && this.isVisible(button)) {
@@ -134,15 +315,16 @@ class CookieDecliner {
                 // Invalid selector, continue
             }
         }
-
         return false;
     }
 
+    // ─── Strategy 9: DOM removal ──────────────────────────────────────────────
+
     /**
-     * Last resort: directly remove the banner from DOM
+     * Last resort: directly remove the banner from DOM.
      */
     removeDirectly(banner) {
-        console.log('Removing banner directly from DOM');
+        console.log('[Cookie Auto Decliner] Removing banner directly from DOM');
         banner.style.display = 'none';
         banner.remove();
         this.stats.closed++;
@@ -162,14 +344,13 @@ class CookieDecliner {
      * Find the "Manage preferences / Customize" button within a banner.
      * Deliberately excludes buttons that accept, save, or reject so we
      * don't accidentally trigger other strategies.
+     * Used as a fallback when classified.manageButtons is empty.
      */
     findManageButton(banner) {
         const skipWords = ['save', 'confirm', 'accept', 'allow', 'reject', 'decline', 'deny', 'refuse', 'close', 'dismiss'];
         const buttons = banner.querySelectorAll('button, a[role="button"], [role="button"]');
 
         for (const btn of buttons) {
-            // Don't use isVisible() here — buttons inside a visibility:hidden container
-            // inherit that property and would all be rejected. Only skip display:none.
             if (window.getComputedStyle(btn).display === 'none') continue;
 
             const text = (
@@ -177,7 +358,6 @@ class CookieDecliner {
                 btn.getAttribute('aria-label') || btn.getAttribute('title') || ''
             ).toLowerCase().trim();
 
-            // Skip if it looks like an accept / save / reject action
             if (skipWords.some(w => text.includes(w))) continue;
 
             const matchesManage = COOKIE_SELECTORS.manageButtons.some(pattern => {
@@ -187,7 +367,6 @@ class CookieDecliner {
                 return text.includes(pattern.toLowerCase());
             });
 
-            // Also catch collapsed expanders (aria-expanded="false") even if text didn't match
             const isCollapsedToggler = btn.getAttribute('aria-expanded') === 'false';
 
             if (matchesManage || isCollapsedToggler) {
@@ -227,7 +406,6 @@ class CookieDecliner {
         );
         for (const toggle of ariaToggles) {
             if (!this.isVisible(toggle)) continue;
-            // Skip if it looks like an essential / required toggle (often labelled)
             const label = (toggle.getAttribute('aria-label') || toggle.textContent || '').toLowerCase();
             const isEssential = ['essential', 'necessary', 'required', 'strictly'].some(w => label.includes(w));
             if (isEssential) continue;
@@ -247,7 +425,6 @@ class CookieDecliner {
     findSaveButton(container) {
         const { button } = this.findButtonWithPattern(container, COOKIE_SELECTORS.saveButtons);
         if (button) return button;
-        // Widen search if not found inside the banner
         if (container !== document.body) {
             const { button: bodyBtn } = this.findButtonWithPattern(document.body, COOKIE_SELECTORS.saveButtons);
             return bodyBtn;
@@ -256,77 +433,10 @@ class CookieDecliner {
     }
 
     /**
-     * Strategy 3: If the banner already has visible (or aria-hidden) toggles,
-     * disable them all and click the save button.
-     * Handles inline expansion patterns (the toggles are in the DOM but hidden).
-     */
-    async disableTogglesAndSave(banner) {
-        // Search including aria-hidden children (they may be toggled visible later)
-        const disabledAny = this.disableAllToggles(banner);
-        if (!disabledAny) return false;
-
-        await this.wait(200);
-
-        const saveBtn = this.findSaveButton(banner);
-        if (saveBtn) {
-            console.log('[Cookie Auto Decliner] Clicking save button after disabling inline toggles');
-            this.simulateClick(saveBtn);
-            return true;
-        }
-
-        console.log('[Cookie Auto Decliner] Disabled toggles but no save button found yet (will try manage flow next)');
-        return false;
-    }
-
-    /**
-     * Strategy 4: Click the "Manage preferences" button, wait for the panel
-     * to appear, disable all opt-in toggles, then click save.
-     * Also re-runs disableAllToggles on document.body to catch panels injected
-     * outside the original banner element.
-     */
-    async handleManageAndDisableFlow(banner) {
-        const manageBtn = this.findManageButton(banner);
-        if (!manageBtn) {
-            console.log('[Cookie Auto Decliner] No manage button found, skipping two-step flow');
-            return false;
-        }
-
-        console.log('[Cookie Auto Decliner] Clicking manage/customize button to expand preferences panel');
-        this.simulateClick(manageBtn);
-
-        // Wait for the panel to expand / be injected into the DOM
-        await this.wait(700);
-
-        // Disable toggles — check inside banner first, then full page
-        let disabledAny = this.disableAllToggles(banner);
-        if (!disabledAny) {
-            disabledAny = this.disableAllToggles(document.body);
-        }
-
-        if (disabledAny) {
-            await this.wait(200);
-        }
-
-        // Look for a save button — inside banner, then full page
-        const saveBtn = this.findSaveButton(banner);
-        if (saveBtn) {
-            console.log('[Cookie Auto Decliner] Clicking save button after manage + disable flow');
-            this.simulateClick(saveBtn);
-            return true;
-        }
-
-        // If we at least disabled some toggles, consider it a partial win
-        // (the page's own periodic save may pick up the unchecked state)
-        if (disabledAny) {
-            console.log('[Cookie Auto Decliner] Disabled toggles via manage flow (no save button found)');
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Find a button matching any of the given patterns; returns button and which pattern matched (for logging).
+     * Find a button matching any of the given patterns.
+     * Checks text content, aria-label, and title against plain-text patterns,
+     * then checks selector-based patterns (those starting with "[").
+     * Returns { button, matchedPattern } or { button: null, matchedPattern: null }.
      */
     findButtonWithPattern(banner, patterns) {
         try {
@@ -336,8 +446,6 @@ class CookieDecliner {
             const buttons = banner.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]');
 
             for (const button of buttons) {
-                // Don't use isVisible() — buttons inside a visibility:hidden banner
-                // inherit that style and would all be skipped. Only exclude display:none.
                 if (window.getComputedStyle(button).display === 'none') continue;
 
                 const rawText = (button.innerText ?? button.textContent ?? button.value ?? '').toString();
@@ -348,25 +456,23 @@ class CookieDecliner {
                 for (const pattern of patterns) {
                     if (typeof pattern === 'string' && !pattern.startsWith('[')) {
                         const patternLower = pattern.toLowerCase();
-                        if (buttonText.includes(patternLower) ||
+                        if (
+                            buttonText.includes(patternLower) ||
                             ariaLabel.includes(patternLower) ||
-                            title.includes(patternLower)) {
-                            console.log('[Cookie Auto Decliner] Pattern matched (decline/necessary):', {
-                                pattern,
-                                detectedText: { buttonText: buttonText.slice(0, 60), ariaLabel: ariaLabel.slice(0, 60), title: title.slice(0, 60) }
-                            });
+                            title.includes(patternLower)
+                        ) {
                             return { button, matchedPattern: pattern };
                         }
                     }
                 }
             }
 
+            // Second pass: CSS selector patterns
             for (const pattern of patterns) {
                 if (typeof pattern === 'string' && pattern.startsWith('[')) {
                     try {
                         const element = banner.querySelector(pattern);
                         if (element && window.getComputedStyle(element).display !== 'none') {
-                            console.log('[Cookie Auto Decliner] Pattern matched (selector):', { pattern });
                             return { button: element, matchedPattern: pattern };
                         }
                     } catch (e) {
@@ -392,8 +498,6 @@ class CookieDecliner {
      * Simulate a human-like click on an element
      */
     simulateClick(element) {
-        // Try multiple click methods for compatibility
-
         // Method 1: Standard click
         element.click();
 
@@ -420,9 +524,7 @@ class CookieDecliner {
         const style = window.getComputedStyle(element);
         if (style.display === 'none') return false;
 
-        // Some consent modals (e.g. slide-in banners) use visibility:hidden as the animation
-        // start state while still being aria-accessible (aria-hidden="false").  Honour that
-        // explicit accessibility signal and don't treat such elements as invisible.
+        // Honour aria-hidden="false" on elements using visibility:hidden as an animation start state
         const ariaHiddenAttr = element.getAttribute('aria-hidden');
         const explicitlyAriaVisible = ariaHiddenAttr === 'false';
         if (style.visibility === 'hidden' && !explicitlyAriaVisible) return false;
@@ -453,7 +555,6 @@ class CookieDecliner {
         document.body.style.overflow = '';
         document.documentElement.style.overflow = '';
 
-        // Remove scroll-blocking classes
         const scrollBlockClasses = ['no-scroll', 'modal-open', 'overflow-hidden'];
         scrollBlockClasses.forEach(className => {
             document.body.classList.remove(className);
